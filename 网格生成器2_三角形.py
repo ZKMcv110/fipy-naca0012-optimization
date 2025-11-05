@@ -59,8 +59,8 @@ def main():
     padding = 8.0
     domain_x_min, domain_y_min = x_min - padding, y_min - padding
     domain_x_max, domain_y_max = x_max + padding, y_max + padding
-    lcar_airfoil = 0.05;
-    lcar_domain = 2.0
+    lcar_airfoil = 0.1;  # 增加翼型周围网格密度
+    lcar_domain = 0.2   # 增加计算域周围网格密度
 
     # 创建几何实体
     p1 = geom.addPoint(domain_x_min, domain_y_min, 0, lcar_domain)

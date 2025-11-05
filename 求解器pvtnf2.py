@@ -20,7 +20,6 @@ except ImportError:
     print("请使用 'pip install scipy' 或 'conda install scipy' 进行安装。")
     exit()
 
-
 def load_mesh():
     """加载网格"""
     filename = "airfoil_array"
@@ -38,7 +37,6 @@ def load_mesh():
     mesh = Gmsh2D(msh_filename)
     return mesh
 
-
 def setup_physical_parameters():
     """设置物理参数"""
     # 流体属性
@@ -51,9 +49,8 @@ def setup_physical_parameters():
     Cp_fluid = 1.0  # 流体比热容
     T_inlet = 293.15  # 入口温度 (K, 例如 20°C)
     T_airfoil = 353.15  # 翼型表面恒定温度 (K, 例如 80°C)
-
+    
     return mu, rho, U, k_fluid, Cp_fluid, T_inlet, T_airfoil
-
 
 def setup_variables_and_boundary_conditions(mesh, U, T_inlet, T_airfoil):
     """设置变量和边界条件"""
@@ -106,20 +103,19 @@ def setup_variables_and_boundary_conditions(mesh, U, T_inlet, T_airfoil):
     T.constrain(T_airfoil, airfoilsFace)  # 翼型表面温度恒定
     T.faceGrad.constrain(0, top_bottomFace)  # 上下壁面绝热
     T.faceGrad.constrain(0, outletFace)  # 出口自由流出
-
+    
     return Vc, Vcf, Vx, Vy, Vf, p, pc, apx, T, inletFace, outletFace, airfoilsFace, top_bottomFace
-
 
 def build_equations(rho, mu, k_fluid, Cp_fluid, Vf, Vx, Vy, p, apx, mesh, T, pc):
     """构建控制方程"""
     # 动量方程
     Vx_Eq = UpwindConvectionTerm(coeff=rho * Vf, var=Vx) == \
-        DiffusionTerm(coeff=mu, var=Vx) - \
-        ImplicitSourceTerm(coeff=1.0, var=p.grad[0])
-
+            DiffusionTerm(coeff=mu, var=Vx) - \
+            ImplicitSourceTerm(coeff=1.0, var=p.grad[0])
+            
     Vy_Eq = UpwindConvectionTerm(coeff=rho * Vf, var=Vy) == \
-        DiffusionTerm(coeff=mu, var=Vy) - \
-        ImplicitSourceTerm(coeff=1.0, var=p.grad[1])
+            DiffusionTerm(coeff=mu, var=Vy) - \
+            ImplicitSourceTerm(coeff=1.0, var=p.grad[1])
 
     # 压力修正方程
     coeff = (1. / (apx.faceValue * mesh._faceAreas * mesh._cellDistances))
@@ -129,10 +125,9 @@ def build_equations(rho, mu, k_fluid, Cp_fluid, Vf, Vx, Vy, p, apx, mesh, T, pc)
 
     # 温度方程
     T_Eq = UpwindConvectionTerm(coeff=rho * Cp_fluid * Vf, var=T) == \
-        DiffusionTerm(coeff=k_fluid, var=T)
-
+           DiffusionTerm(coeff=k_fluid, var=T)
+           
     return Vx_Eq, Vy_Eq, pc_Eq, T_Eq
-
 
 def overflow_prevention(Vx, Vy, p, V_limit=1e2, p_limit=2e3):
     """防止变量溢出"""
@@ -141,13 +136,12 @@ def overflow_prevention(Vx, Vy, p, V_limit=1e2, p_limit=2e3):
     Vy.value[Vy.value > V_limit] = V_limit
     Vy.value[Vy.value < -V_limit] = -V_limit
     p.value[p.value > p_limit] = p_limit
-    p.value[p.value < -p_limit] = -V_limit
-
+    p.value[p.value < -p_limit] = -p_limit
 
 def sweep(Vx_Eq, Vy_Eq, pc_Eq, Vx, Vy, p, pc, Vf, Vc, Vcf, apx, Rp, Rv):
     """执行一次迭代"""
     overflow_prevention(Vx, Vy, p)
-
+    
     Vx_Eq.cacheMatrix()
     xres = Vx_Eq.sweep(var=Vx, underRelaxation=Rv)
     xmat = Vx_Eq.matrix
@@ -157,10 +151,8 @@ def sweep(Vx_Eq, Vy_Eq, pc_Eq, Vx, Vy, p, pc, Vf, Vc, Vcf, apx, Rp, Rv):
 
     presgrad = p.grad
     facepresgrad = presgrad.faceValue
-    Vf[0] = Vx.faceValue + Vcf / apx.faceValue * \
-        (presgrad[0].faceValue - facepresgrad[0])
-    Vf[1] = Vy.faceValue + Vcf / apx.faceValue * \
-        (presgrad[1].faceValue - facepresgrad[1])
+    Vf[0] = Vx.faceValue + Vcf / apx.faceValue * (presgrad[0].faceValue - facepresgrad[0])
+    Vf[1] = Vy.faceValue + Vcf / apx.faceValue * (presgrad[1].faceValue - facepresgrad[1])
 
     pcres = pc_Eq.sweep(var=pc)
 
@@ -170,24 +162,22 @@ def sweep(Vx_Eq, Vy_Eq, pc_Eq, Vx, Vy, p, pc, Vf, Vc, Vcf, apx, Rp, Rv):
 
     presgrad = p.grad
     facepresgrad = presgrad.faceValue
-    Vf[0] = Vx.faceValue + Vcf / apx.faceValue * \
-        (presgrad[0].faceValue - facepresgrad[0])
-    Vf[1] = Vy.faceValue + Vcf / apx.faceValue * \
-        (presgrad[1].faceValue - facepresgrad[1])
-
+    Vf[0] = Vx.faceValue + Vcf / apx.faceValue * (presgrad[0].faceValue - facepresgrad[0])
+    Vf[1] = Vy.faceValue + Vcf / apx.faceValue * (presgrad[1].faceValue - facepresgrad[1])
+    
     return xres, yres, pcres
-
 
 def value_range(val, a, b):
     """判断值是否在范围内"""
     return (val > a and val <= b)
 
-
-def calculate_performance_parameters(mesh, p, T, Vf, rho, U, k_fluid, T_inlet, T_airfoil,
-                                     inletFace, outletFace, airfoilsFace):
+# --- 关键修正: 接收 L_channel, H_channel, D_h 作为参数 ---
+def calculate_performance_parameters(mesh, p, T, Vf, rho, U, k_fluid, T_inlet, T_airfoil, 
+                                     inletFace, outletFace, airfoilsFace,
+                                     L_channel, H_channel, D_h):
     """计算性能参数（摩擦系数和努塞尔数）"""
     print("\n开始进行后处理: 计算 Darcy 摩擦系数 (f) 和 Nusselt 数 (Nu)...")
-
+    
     # 共享变量和几何参数
     faceAreas = mesh._faceAreas  # (带下划线)
     faceNormals = mesh.faceNormals  # (不带下划线)
@@ -197,15 +187,7 @@ def calculate_performance_parameters(mesh, p, T, Vf, rho, U, k_fluid, T_inlet, T
     outletFaceMask = outletFace.value
     airfoil_mask = airfoilsFace.value
 
-    # 计算通道几何参数
-    x_coords = mesh.cellCenters[0].value
-    y_coords = mesh.cellCenters[1].value
-    L_channel = numerix.max(x_coords) - numerix.min(x_coords)
-    H_channel = numerix.max(y_coords) - numerix.min(y_coords)
-
-    # 水力直径
-    D_h = 2 * H_channel
-
+    # --- 关键修正: 几何参数已从 main 传入，无需再次计算 ---
     print("-" * 30)
     print("几何参数 (用于 f 和 Nu):")
     print(f"  通道长度 (L_channel): {L_channel:.4f} m")
@@ -214,81 +196,57 @@ def calculate_performance_parameters(mesh, p, T, Vf, rho, U, k_fluid, T_inlet, T
     print("-" * 30)
 
     # 计算 Darcy 摩擦系数 (f)
-    # 计算入口和出口的面积加权平均压力
     inletPressures = p.faceValue.value[inletFaceMask]
     outletPressures = p.faceValue.value[outletFaceMask]
-
     inletAreas = faceAreas[inletFaceMask]
     outletAreas = faceAreas[outletFaceMask]
-
-    P_inlet_avg = numerix.sum(
-        inletPressures * inletAreas) / numerix.sum(inletAreas)
-    P_outlet_avg = numerix.sum(
-        outletPressures * outletAreas) / numerix.sum(outletAreas)
-
-    # 计算压降
+    P_inlet_avg = numerix.sum(inletPressures * inletAreas) / numerix.sum(inletAreas)
+    P_outlet_avg = numerix.sum(outletPressures * outletAreas) / numerix.sum(outletAreas)
     delta_P = P_inlet_avg - P_outlet_avg
-
-    # 计算 f (Darcy-Weisbach 定义)
     darcy_f = (D_h * 2 * delta_P) / (L_channel * rho * U ** 2)
 
     print("摩擦系数 (f) 计算结果:")
     print(f"  入口平均压力 (P_inlet_avg): {P_inlet_avg:.4e} Pa")
     print(f"  出口平均压力 (P_outlet_avg): {P_outlet_avg:.4e} Pa")
-    print(f"  压降 (Delta_P)        : {delta_P:.4e} Pa")
-    print(f"  Darcy 摩擦系数 (f)    : {abs(darcy_f):.6f}")
+    print(f"  压降 (Delta_P)         : {delta_P:.4e} Pa")
+    print(f"  Darcy 摩擦系数 (f)     : {abs(darcy_f):.6f}")
     print("-" * 30)
 
     # 计算 Nusselt 数 (Nu)
-    # 计算翼型表面的总传热量 Q_total
     grad_T_face = T.grad.faceValue
     gradT_dot_n = numerix.sum(grad_T_face.value * faceNormals, axis=0)
     local_heat_flux = -k_fluid * gradT_dot_n
     Q_per_face = local_heat_flux * faceAreas
     Q_total = numerix.sum(Q_per_face[airfoil_mask])
-
-    # 计算翼型总湿面积 A_wetted
     A_wetted = numerix.sum(faceAreas[airfoil_mask])
 
-    # 计算出口质量加权平均温度
     T_outlet = T.faceValue.value[outletFaceMask]
     Vf_outlet_vector = Vf.value[..., outletFaceMask]
     normals_outlet = faceNormals[..., outletFaceMask]
     areas_outlet = faceAreas[outletFaceMask]
-
     v_dot_n_outlet = numerix.sum(Vf_outlet_vector * normals_outlet, axis=0)
     mass_flow_rate_per_face = rho * v_dot_n_outlet * areas_outlet
-
     T_weighted_numerator = numerix.sum(T_outlet * mass_flow_rate_per_face)
     total_mass_flow_rate = numerix.sum(mass_flow_rate_per_face)
-
-    # 质量加权的出口平均温度
     T_outlet_avg = T_weighted_numerator / total_mass_flow_rate
 
-    # 计算对数平均温差
     delta_T_in = T_airfoil - T_inlet
     delta_T_out = T_airfoil - T_outlet_avg
 
     if abs(delta_T_out - delta_T_in) < 1e-6:
-        # 温差几乎不变
         delta_T_lmtd = delta_T_in
     elif delta_T_out <= 0 or (delta_T_out / delta_T_in) <= 0:
-        print("警告: LMTD 计算出现非正温差，可能由于出口温度等于或超过翼型温度。")
+        print("警告: LMTD 计算出现非正温差。")
         print(f"  DeltaT_in: {delta_T_in:.2f}, DeltaT_out: {delta_T_out:.2f}")
         print("  将使用算术平均温差代替 LMTD。")
         delta_T_lmtd = (delta_T_in + delta_T_out) / 2.0
-        if delta_T_lmtd <= 0:
-            delta_T_lmtd = delta_T_in
+        if delta_T_lmtd <= 0: delta_T_lmtd = delta_T_in
     else:
-        # 正常 LMTD 计算
-        delta_T_lmtd = (delta_T_out - delta_T_in) / \
-            numerix.log(delta_T_out / delta_T_in)
+        delta_T_lmtd = (delta_T_out - delta_T_in) / numerix.log(delta_T_out / delta_T_in)
 
-    # 计算平均传热系数
     if delta_T_lmtd == 0:
         print("错误: 平均温差为零，无法计算 h_avg。")
-        h_avg = 0.0
-        Nu_avg = 0.0
+        h_avg = 0.0; Nu_avg = 0.0
     else:
         h_avg = abs(Q_total) / (A_wetted * abs(delta_T_lmtd))
         L_characteristic = D_h
@@ -297,65 +255,51 @@ def calculate_performance_parameters(mesh, p, T, Vf, rho, U, k_fluid, T_inlet, T
     print("努塞尔数 (Nu) 计算结果:")
     print(f"  翼型总散热量 (Q_total) : {Q_total:.4e} W")
     print(f"  翼型总湿面积 (A_wetted): {A_wetted:.4e} m^2")
-    print(f"  入口温度 (T_inlet)     : {T_inlet:.2f} K")
+    print(f"  入口温度 (T_inlet)       : {T_inlet:.2f} K")
     print(f"  出口平均温度 (T_outlet_avg): {T_outlet_avg:.2f} K")
-    print(f"  对数平均温差 (LMTD)  : {delta_T_lmtd:.2f} K")
+    print(f"  对数平均温差 (LMTD)   : {delta_T_lmtd:.2f} K")
     print(f"  平均传热系数 (h_avg) : {h_avg:.4f} W/(m^2·K)")
     print(f"  (使用特征长度 L_c = {L_characteristic:.4f} m)")
-    print(f"  平均努塞尔数 (Nu_avg)  : {Nu_avg:.4f}")
+    print(f"  平均努塞尔数 (Nu_avg)   : {Nu_avg:.4f}")
     print("-" * 30)
-
-    return abs(darcy_f), Nu_avg, L_channel, H_channel, D_h, P_inlet_avg, P_outlet_avg, delta_P, Q_total, A_wetted, T_outlet_avg, delta_T_lmtd, h_avg
-
+    
+    return abs(darcy_f), Nu_avg
 
 def save_solution(mesh, Vx, Vy, p, T, Nu_avg, darcy_f):
     """保存求解结果"""
     print("正在保存求解结果...")
-
-    # 创建保存目录
+    
     if not os.path.exists('solver_results'):
         os.makedirs('solver_results')
-
-    # 准备要保存的数据
+        
     results = {
-        'mesh': mesh,
-        'Vx': Vx,
-        'Vy': Vy,
-        'p': p,
-        'T': T,
-        'Nu': Nu_avg,
-        'f': darcy_f,
-        'target_param': Nu_avg / (darcy_f**(1/3)) if darcy_f != 0 else 0
+        'mesh': mesh, 'Vx': Vx, 'Vy': Vy, 'p': p, 'T': T,
+        'Nu': Nu_avg, 'f': darcy_f,
+        'target_param': Nu_avg / (darcy_f**(1/3)) if darcy_f > 0 else 0
     }
-
-    # 保存结果
+    
     with open('solver_results/latest_solution.pkl', 'wb') as f:
         pickle.dump(results, f)
     print("求解结果已保存到 solver_results/latest_solution.pkl")
 
-
-def extended_postprocessing(mesh, Vx, Vy, p, T, Nu_avg, darcy_f, L_channel, H_channel, D_h,
-                            P_inlet_avg, P_outlet_avg, delta_P, Q_total, A_wetted, T_outlet_avg,
-                            delta_T_lmtd, h_avg, T_inlet, T_airfoil, base_results_dir):
+# --- 关键修正: 接收 L_channel, H_channel, D_h 作为参数 ---
+def extended_postprocessing(mesh, Vx, Vy, p, T, Nu_avg, darcy_f, base_results_dir,
+                            L_channel, H_channel, D_h):
     """扩展后处理功能"""
     print("\n开始执行扩展后处理...")
-
-    # 计算速度模
+    
     V_mag = CellVariable(mesh=mesh, name="velocity magnitude")
     V_mag.setValue(numerix.sqrt(Vx.value**2 + Vy.value**2))
-
-    # 计算涡量（z方向分量）
+    
     omega_z = CellVariable(mesh=mesh, name="vorticity (z)")
     omega_z.setValue(Vy.grad[0].value - Vx.grad[1].value)
-
-    # 使用传入的目录而不是创建新的
+    
     results_dir = base_results_dir
-
+    
     # 1. 沿中心线的速度分布（y=0）
     x_coords = mesh.cellCenters[0]
     y_coords = mesh.cellCenters[1]
-
-    # 找到接近y=0的点
+    
     center_line_indices = numerix.where(numerix.abs(y_coords.value) < 0.5)[0]
     if len(center_line_indices) > 0:
         x_center = x_coords.value[center_line_indices]
@@ -364,8 +308,7 @@ def extended_postprocessing(mesh, Vx, Vy, p, T, Nu_avg, darcy_f, L_channel, H_ch
         Vmag_center = V_mag.value[center_line_indices]
         p_center = p.value[center_line_indices]
         T_center = T.value[center_line_indices]
-
-        # 按x坐标排序
+        
         sorted_indices = numerix.argsort(x_center)
         x_center = x_center[sorted_indices]
         Vx_center = Vx_center[sorted_indices]
@@ -373,113 +316,39 @@ def extended_postprocessing(mesh, Vx, Vy, p, T, Nu_avg, darcy_f, L_channel, H_ch
         Vmag_center = Vmag_center[sorted_indices]
         p_center = p_center[sorted_indices]
         T_center = T_center[sorted_indices]
-
-        # 绘制速度分布
+        
         plt.figure(figsize=(15, 10))
-
-        plt.subplot(2, 3, 1)
-        plt.plot(x_center, Vx_center, 'b-', label='Vx')
-        plt.xlabel('x')
-        plt.ylabel('Vx')
-        plt.title('Streamwise Velocity Profile Along Center Line')
-        plt.grid(True)
-
-        plt.subplot(2, 3, 2)
-        plt.plot(x_center, Vy_center, 'r-', label='Vy')
-        plt.xlabel('x')
-        plt.ylabel('Vy')
-        plt.title('Normal Velocity Profile Along Center Line')
-        plt.grid(True)
-
-        plt.subplot(2, 3, 3)
-        plt.plot(x_center, Vmag_center, 'g-', label='|V|')
-        plt.xlabel('x')
-        plt.ylabel('|V|')
-        plt.title('Velocity Magnitude Profile Along Center Line')
-        plt.grid(True)
-
-        plt.subplot(2, 3, 4)
-        plt.plot(x_center, p_center, 'k-', label='p')
-        plt.xlabel('x')
-        plt.ylabel('p')
-        plt.title('Pressure Profile Along Center Line')
-        plt.grid(True)
-
-        plt.subplot(2, 3, 5)
-        plt.plot(x_center, T_center, 'm-', label='T')
-        plt.xlabel('x')
-        plt.ylabel('T (K)')
-        plt.title('Temperature Profile Along Center Line')
-        plt.grid(True)
-
+        plt.subplot(2, 3, 1); plt.plot(x_center, Vx_center, 'b-'); plt.xlabel('x'); plt.ylabel('Vx'); plt.title('Streamwise Velocity Profile'); plt.grid(True)
+        plt.subplot(2, 3, 2); plt.plot(x_center, Vy_center, 'r-'); plt.xlabel('x'); plt.ylabel('Vy'); plt.title('Normal Velocity Profile'); plt.grid(True)
+        plt.subplot(2, 3, 3); plt.plot(x_center, Vmag_center, 'g-'); plt.xlabel('x'); plt.ylabel('|V|'); plt.title('Velocity Magnitude Profile'); plt.grid(True)
+        plt.subplot(2, 3, 4); plt.plot(x_center, p_center, 'k-'); plt.xlabel('x'); plt.ylabel('p'); plt.title('Pressure Profile'); plt.grid(True)
+        plt.subplot(2, 3, 5); plt.plot(x_center, T_center, 'm-'); plt.xlabel('x'); plt.ylabel('T (K)'); plt.title('Temperature Profile'); plt.grid(True)
+        
         plt.tight_layout()
         plt.savefig(os.path.join(results_dir, 'center_line_profiles.png'))
         plt.close()
-
-        # 保存数据为CSV
-        data = np.column_stack(
-            (x_center, Vx_center, Vy_center, Vmag_center, p_center, T_center))
-        np.savetxt(
-            os.path.join(results_dir, 'center_line_profiles.csv'),
-            data,
-            delimiter=',',
-            header='x,Vx,Vy,Vmag,pressure,temperature',
-            comments=''
-        )
-
+        
+        data = np.column_stack((x_center, Vx_center, Vy_center, Vmag_center, p_center, T_center))
+        np.savetxt(os.path.join(results_dir, 'center_line_profiles.csv'), data, delimiter=',', header='x,Vx,Vy,Vmag,pressure,temperature', comments='')
+    
     # 2. 生成带流线的云图
     try:
-        # 绘制速度云图
-        plt.figure(figsize=(10, 8))
-        viewer = Viewer(vars=V_mag, title="Velocity Magnitude")
-        viewer.plot()
-        plt.savefig(os.path.join(results_dir, 'velocity_magnitude.png'))
-        plt.close()
-
-        # 绘制压力云图
-        plt.figure(figsize=(10, 8))
-        viewer = Viewer(vars=p, title="Pressure")
-        viewer.plot()
-        plt.savefig(os.path.join(results_dir, 'pressure.png'))
-        plt.close()
-
-        # 绘制温度云图
-        plt.figure(figsize=(10, 8))
-        viewer = Viewer(vars=T, title="Temperature")
-        viewer.plot()
-        plt.savefig(os.path.join(results_dir, 'temperature.png'))
-        plt.close()
-
-        # 绘制涡量云图
-        plt.figure(figsize=(10, 8))
-        viewer = Viewer(vars=omega_z, title="Vorticity")
-        viewer.plot()
-        plt.savefig(os.path.join(results_dir, 'vorticity.png'))
-        plt.close()
-
+        plt.figure(figsize=(10, 8)); viewer = Viewer(vars=V_mag, title="Velocity Magnitude"); viewer.plot(); plt.savefig(os.path.join(results_dir, 'velocity_magnitude.png')); plt.close()
+        plt.figure(figsize=(10, 8)); viewer = Viewer(vars=p, title="Pressure"); viewer.plot(); plt.savefig(os.path.join(results_dir, 'pressure.png')); plt.close()
+        plt.figure(figsize=(10, 8)); viewer = Viewer(vars=T, title="Temperature"); viewer.plot(); plt.savefig(os.path.join(results_dir, 'temperature.png')); plt.close()
+        plt.figure(figsize=(10, 8)); viewer = Viewer(vars=omega_z, title="Vorticity"); viewer.plot(); plt.savefig(os.path.join(results_dir, 'vorticity.png')); plt.close()
     except Exception as e:
         print(f"绘制云图时出错: {e}")
         print("跳过云图生成...")
-
+    
     # 3. 导出数据为CSV格式
-    # 获取网格点坐标
     x_coords = mesh.cellCenters[0].value
     y_coords = mesh.cellCenters[1].value
-
-    # 创建数据矩阵
-    data = np.column_stack(
-        (x_coords, y_coords, Vx.value, Vy.value, p.value, T.value))
-
-    # 保存为CSV
-    np.savetxt(
-        os.path.join(results_dir, "field_data.csv"),
-        data,
-        delimiter=",",
-        header="x,y,Vx,Vy,pressure,temperature",
-        comments=""
-    )
-
+    data = np.column_stack((x_coords, y_coords, Vx.value, Vy.value, p.value, T.value))
+    np.savetxt(os.path.join(results_dir, "field_data.csv"), data, delimiter=",", header="x,y,Vx,Vy,pressure,temperature", comments="")
+    
     # 4. 生成总结报告
+    # --- 关键修正: 这里的变量 L_channel, H_channel, D_h 现在可以被正确访问 ---
     report_content = f"""
 CFD后处理总结报告
 ==================
@@ -494,11 +363,9 @@ CFD后处理总结报告
 - 最大速度: {numerix.max(V_mag.value):.4f}
 - 最小速度: {numerix.min(V_mag.value):.4f}
 - 平均速度: {numerix.average(V_mag.value):.4f}
-
 - 最大压力: {numerix.max(p.value):.4f}
 - 最小压力: {numerix.min(p.value):.4f}
 - 平均压力: {numerix.average(p.value):.4f}
-
 - 最高温度: {numerix.max(T.value):.2f} K
 - 最低温度: {numerix.min(T.value):.2f} K
 - 平均温度: {numerix.average(T.value):.2f} K
@@ -515,30 +382,15 @@ CFD后处理总结报告
 - 通道高度 (H_channel): {H_channel:.4f} m
 - 水力直径 (D_h): {D_h:.4f} m
 
-流场性能:
---------
-- 入口平均压力 (P_inlet_avg): {P_inlet_avg:.4e} Pa
-- 出口平均压力 (P_outlet_avg): {P_outlet_avg:.4e} Pa
-- 压降 (Delta_P): {delta_P:.4e} Pa
-
-传热性能:
---------
-- 翼型总散热量 (Q_total): {Q_total:.4e} W
-- 翼型总湿面积 (A_wetted): {A_wetted:.4e} m^2
-- 入口温度 (T_inlet): {T_inlet:.2f} K
-- 出口平均温度 (T_outlet_avg): {T_outlet_avg:.2f} K
-- 对数平均温差 (LMTD): {delta_T_lmtd:.2f} K
-- 平均传热系数 (h_avg): {h_avg:.4f} W/(m^2·K)
+(报告中使用的Nu和f的详细计算过程见 calculate_performance_parameters 函数的打印输出)
 
 报告生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 """
-
-    # 保存报告
+    
     with open(os.path.join(results_dir, "summary_report.txt"), "w", encoding="utf-8") as f:
         f.write(report_content)
-
+    
     print(f"扩展后处理完成，结果已保存到: {results_dir}")
-
 
 def visualize_results(mesh, p, Vx, Vy, T, sum_res_list, MaxSweep, sum_res, T_inlet, T_airfoil, results_dir):
     """可视化结果"""
@@ -560,39 +412,28 @@ def visualize_results(mesh, p, Vx, Vy, T, sum_res_list, MaxSweep, sum_res, T_inl
     plt.savefig(os.path.join(results_dir, "convergence_history.png"))
     plt.close()
 
-    print("\n正在生成场变量云图...")
+    print("\n正在生成交互式云图...")
+    print("请注意: 每个Viewer窗口弹出后，程序会暂停。")
+    print("请在查看完毕后手动关闭窗口，或按 'q' 键关闭，程序才会继续。")
 
-    # 防止变量溢出
     overflow_prevention(Vx, Vy, p)
 
-    # 压力场可视化
-    plt.figure(figsize=(10, 8))
     viewer_p = Viewer(vars=p, title="Pressure Field")
     viewer_p.plot()
-    plt.savefig(os.path.join(results_dir, "pressure_field.png"))
-    plt.close()
+    viewer_p.fig.savefig(os.path.join(results_dir, "pressure_field.png"))
 
-    # X速度场可视化
-    plt.figure(figsize=(10, 8))
     viewer_vx = Viewer(vars=Vx, title="X Velocity Field")
     viewer_vx.plot()
-    plt.savefig(os.path.join(results_dir, "velocity_x.png"))
-    plt.close()
+    viewer_vx.fig.savefig(os.path.join(results_dir, "velocity_x.png"))
 
-    # Y速度场可视化
-    plt.figure(figsize=(10, 8))
     viewer_vy = Viewer(vars=Vy, title="Y Velocity Field")
     viewer_vy.plot()
-    plt.savefig(os.path.join(results_dir, "velocity_y.png"))
-    plt.close()
+    viewer_vy.fig.savefig(os.path.join(results_dir, "velocity_y.png"))
 
     # 温度场可视化
-    plt.figure(figsize=(10, 8))
-    viewer_T = Viewer(vars=T, title="Temperature Field (K)",
-                      datamin=T_inlet, datamax=T_airfoil)
+    viewer_T = Viewer(vars=T, title="Temperature Field (K)", datamin=T_inlet, datamax=T_airfoil)
     viewer_T.plot()
-    plt.savefig(os.path.join(results_dir, "temperature_field.png"))
-    plt.close()
+    viewer_T.fig.savefig(os.path.join(results_dir, "temperature_field.png"))
 
     print("\n所有图片已保存。")
     if MaxSweep < 100:
@@ -600,67 +441,47 @@ def visualize_results(mesh, p, Vx, Vy, T, sum_res_list, MaxSweep, sum_res, T_inl
         print("*** 后处理代码已无语法错误。 ***")
         print("*** 现在请将 MaxSweep 改回 300 进行正式计算。 ***")
 
-    print("后处理完成。")
-
+    input("所有交互式窗口已显示。按回车键退出程序...")
 
 def main():
     """主函数"""
-    # 加载网格
     mesh = load_mesh()
-
-    # 设置物理参数
+    
     mu, rho, U, k_fluid, Cp_fluid, T_inlet, T_airfoil = setup_physical_parameters()
-
-    # 设置变量和边界条件
+    
     Vc, Vcf, Vx, Vy, Vf, p, pc, apx, T, inletFace, outletFace, airfoilsFace, top_bottomFace = \
         setup_variables_and_boundary_conditions(mesh, U, T_inlet, T_airfoil)
-
-    # 构建方程
-    Vx_Eq, Vy_Eq, pc_Eq, T_Eq = build_equations(
-        rho, mu, k_fluid, Cp_fluid, Vf, Vx, Vy, p, apx, mesh, T, pc)
-
-    # 求解参数
-    V_limit = 1e2
-    p_limit = 2e3
-    MaxSweep = 50  # 正式计算时使用300
-    # MaxSweep = 5  # 调试时使用5
+    
+    Vx_Eq, Vy_Eq, pc_Eq, T_Eq = build_equations(rho, mu, k_fluid, Cp_fluid, Vf, Vx, Vy, p, apx, mesh, T, pc)
+    
+    MaxSweep = 100  # 正式计算时使用300
     res_limit = 1e-4
     sum_res_list = []
     sum_res = 1e10
 
-    # 求解循环
     pbar = tqdm(range(MaxSweep), desc="求解流场 (SIMPLE)")
     for i in pbar:
-       # 更平滑的松弛因子策略
-        if sum_res > 1e4:
-            Rp, Rv = 0.3, 0.6  # 初始阶段使用较小的松弛因子
-        elif sum_res > 1e3:
-            Rp, Rv = 0.4, 0.7
-        elif sum_res > 1e2:
-            Rp, Rv = 0.5, 0.8
-        elif sum_res > 1e1:
-            Rp, Rv = 0.6, 0.9
-        else:
-            Rp, Rv = 0.7, 0.95  # 接近收敛时使用较大的松弛因子
-
-        xres, yres, pcres = sweep(
-            Vx_Eq, Vy_Eq, pc_Eq, Vx, Vy, p, pc, Vf, Vc, Vcf, apx, Rp, Rv)
+        if sum_res > 1e4: Rp, Rv = 0.3, 0.6
+        elif sum_res > 1e3: Rp, Rv = 0.4, 0.7
+        elif sum_res > 1e2: Rp, Rv = 0.5, 0.8
+        elif sum_res > 1e1: Rp, Rv = 0.6, 0.9
+        else: Rp, Rv = 0.7, 0.95
+        
+        xres, yres, pcres = sweep(Vx_Eq, Vy_Eq, pc_Eq, Vx, Vy, p, pc, Vf, Vc, Vcf, apx, Rp, Rv)
         sum_res = sum([abs(xres), abs(yres), abs(pcres)])
         sum_res_list.append(sum_res)
-        pbar.set_postfix({"sum res": f'{sum_res:.2e}',
-                         "Rp": f'{Rp:.2f}', "Rv": f'{Rv:.2f}'})
+        pbar.set_postfix({"sum res": f'{sum_res:.2e}', "Rp": f'{Rp:.2f}', "Rv": f'{Rv:.2f}'})
 
         if np.isnan(sum_res):
             print("\n错误: 计算出现无效值(NaN)，求解发散。")
             break
-        if sum_res < res_limit and i > 5:  # 增加一个最小迭代次数
+        if sum_res < res_limit and i > 5:
             print("\n残差收敛，流场求解完成。")
             break
 
-    if i == MaxSweep - 1:
+    if i == MaxSweep - 1: 
         print("\n达到最大迭代次数，流场可能未完全收敛。")
 
-    # 求解温度场
     if 'sum_res' in locals() and not (np.isnan(sum_res) or np.isinf(sum_res)):
         print("\n开始求解温度场...")
         T_Eq.solve(var=T)
@@ -668,31 +489,37 @@ def main():
     else:
         print("\n由于流场计算失败，跳过温度场求解。")
 
-    # 创建统一的结果目录
-    results_dir = os.path.join("results", datetime.now().strftime(
-        "%Y%m%d_%H%M%S") + "_cfd_solution")
+    results_dir = os.path.join("results", datetime.now().strftime("%Y%m%d_%H%M%S") + "_cfd_solution")
     os.makedirs(results_dir, exist_ok=True)
 
-    # 后处理和性能参数计算
+    # --- 关键修正: 在 main 函数中计算一次几何参数 ---
+    print("\n计算几何参数...")
+    x_coords = mesh.cellCenters[0].value
+    y_coords = mesh.cellCenters[1].value
+    L_channel = numerix.max(x_coords) - numerix.min(x_coords)
+    H_channel = numerix.max(y_coords) - numerix.min(y_coords)
+    D_h = 2 * H_channel
+    print(f"  - 通道长度 (L_channel): {L_channel:.4f} m")
+    print(f"  - 通道高度 (H_channel): {H_channel:.4f} m")
+
     if 'sum_res' in locals() and not (np.isnan(sum_res) or np.isinf(sum_res)):
-        darcy_f, Nu_avg, L_channel, H_channel, D_h, P_inlet_avg, P_outlet_avg, delta_P, Q_total, A_wetted, T_outlet_avg, delta_T_lmtd, h_avg = calculate_performance_parameters(
-            mesh, p, T, Vf, rho, U, k_fluid, T_inlet, T_airfoil,
-            inletFace, outletFace, airfoilsFace)
-
-        # 保存结果
+        # --- 关键修正: 将几何参数传递下去 ---
+        darcy_f, Nu_avg = calculate_performance_parameters(
+            mesh, p, T, Vf, rho, U, k_fluid, T_inlet, T_airfoil, 
+            inletFace, outletFace, airfoilsFace,
+            L_channel, H_channel, D_h # <-- 新增
+        )
+        
         save_solution(mesh, Vx, Vy, p, T, Nu_avg, darcy_f)
-
-        # 扩展后处理
-        extended_postprocessing(mesh, Vx, Vy, p, T, Nu_avg, darcy_f, L_channel, H_channel, D_h,
-                                P_inlet_avg, P_outlet_avg, delta_P, Q_total, A_wetted, T_outlet_avg,
-                                delta_T_lmtd, h_avg, T_inlet, T_airfoil, results_dir)
+        
+        # --- 关键修正: 将几何参数传递下去 ---
+        extended_postprocessing(mesh, Vx, Vy, p, T, Nu_avg, darcy_f, results_dir,
+                                L_channel, H_channel, D_h # <-- 新增
+        )
     else:
         print("\n流场计算失败，跳过力与传热计算。")
 
-    # 可视化
-    visualize_results(mesh, p, Vx, Vy, T, sum_res_list,
-                      MaxSweep, sum_res, T_inlet, T_airfoil, results_dir)
-
+    visualize_results(mesh, p, Vx, Vy, T, sum_res_list, MaxSweep, sum_res, T_inlet, T_airfoil, results_dir)
 
 if __name__ == '__main__':
     main()

@@ -16,16 +16,18 @@ import sys
 import os
 import time
 
-def run_single_case(case_id, Tt, Ts, Tad, Tb):
+def run_single_case(case_id, Tt, Ts, Ta, Tad, Twa, Tb):
     """
     运行单个案例
     """
-    print(f"\n运行案例 {case_id}: Tt={Tt:.3f}, Ts={Ts:.3f}, Tad={Tad:.3f}, Tb={Tb:.3f}")
+    print(f"\n运行案例 {case_id}: Tt={Tt:.3f}, Ts={Ts:.3f}, Ta={Ta:.3f}, Tad={Tad:.3f}, Twa={Twa:.3f}, Tb={Tb:.3f}")
     
     # 调用单个案例运行脚本
     cmd = [
         "python", "run_optimization_case.py",
         str(Tt), str(Ts), str(Tad), str(Tb),
+        "--Ta", str(Ta),
+        "--Twa", str(Twa),
         "--output", "csv_data/temp_result.csv"
     ]
     
@@ -42,15 +44,15 @@ def run_single_case(case_id, Tt, Ts, Tad, Tb):
             return result_line
         else:
             print(f"案例 {case_id} 没有产生结果")
-            return f"{case_id},{Tt},{Ts},{Tad},{Tb},0,0,0"
+            return f"{case_id},{Tt},{Ts},{Ta},{Tad},{Twa},{Tb},0,0,0"
             
     except subprocess.CalledProcessError as e:
         print(f"案例 {case_id} 执行失败: {e}")
         print(f"错误输出: {e.stderr}")
-        return f"{case_id},{Tt},{Ts},{Tad},{Tb},0,0,0"
+        return f"{case_id},{Tt},{Ts},{Ta},{Tad},{Twa},{Tb},0,0,0"
     except subprocess.TimeoutExpired:
         print(f"案例 {case_id} 执行超时")
-        return f"{case_id},{Tt},{Ts},{Tad},{Tb},0,0,0"
+        return f"{case_id},{Tt},{Ts},{Ta},{Tad},{Twa},{Tb},0,0,0"
 
 def main():
     # 检查参数采样文件是否存在
@@ -67,7 +69,7 @@ def main():
     
     # 准备结果文件
     result_file = os.path.join("csv_data", "final_results.csv")
-    result_header = "case_id,Tt,Ts,Tad,Tb,Nu,f,target_param\n"
+    result_header = "case_id,Tt,Ts,Ta,Tad,Twa,Tb,Nu,f,target_param\n"
     
     # 写入头部
     with open(result_file, 'w') as f:
@@ -79,11 +81,13 @@ def main():
         case_id = row['case_id']
         Tt = row['Tt']
         Ts = row['Ts']
+        Ta = row['Ta']
         Tad = row['Tad']
+        Twa = row['Twa']
         Tb = row['Tb']
         
         # 运行案例
-        result_line = run_single_case(case_id, Tt, Ts, Tad, Tb)
+        result_line = run_single_case(case_id, Tt, Ts, Ta, Tad, Twa, Tb)
         
         # 保存结果
         with open(result_file, 'a') as f:
